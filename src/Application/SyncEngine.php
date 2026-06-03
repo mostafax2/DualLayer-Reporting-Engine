@@ -4,15 +4,15 @@ namespace Mostafax\DualLayer\Application;
 
 use Illuminate\Support\Facades\Log;
 use Mostafax\DualLayer\Contracts\IdempotencyStoreInterface;
+use Mostafax\DualLayer\Contracts\RetrySchedulerInterface;
 use Mostafax\DualLayer\Contracts\SourceDriverInterface;
 use Mostafax\DualLayer\Contracts\SyncHooksInterface;
 use Mostafax\DualLayer\Contracts\TargetDriverInterface;
 use Mostafax\DualLayer\Contracts\TransformerInterface;
 use Mostafax\DualLayer\Domain\SyncOperation\Entities\SyncOperation;
-use Mostafax\DualLayer\Domain\SyncOperation\Exceptions\SyncException;
+use Mostafax\DualLayer\Domain\SyncOperation\Exceptions\SyncSkippedException;
 use Mostafax\DualLayer\Domain\SyncOperation\Repositories\SyncOperationRepositoryInterface;
 use Mostafax\DualLayer\Domain\SyncOperation\ValueObjects\ModelReference;
-use Mostafax\DualLayer\Infrastructure\Jobs\ProcessSyncJob;
 use Mostafax\DualLayer\Infrastructure\Transformers\DefaultTransformer;
 
 /**
@@ -28,10 +28,11 @@ final class SyncEngine
     private array $hooks = [];
 
     public function __construct(
-        private readonly SourceDriverInterface             $source,
-        private readonly TargetDriverInterface             $target,
-        private readonly IdempotencyStoreInterface         $idempotency,
-        private readonly SyncOperationRepositoryInterface  $repository,
+        private readonly SourceDriverInterface            $source,
+        private readonly TargetDriverInterface            $target,
+        private readonly IdempotencyStoreInterface        $idempotency,
+        private readonly SyncOperationRepositoryInterface $repository,
+        private readonly RetrySchedulerInterface          $retryScheduler,
     ) {}
 
     // ── Registration (called from DualLayerManager) ────────────────────────
@@ -52,7 +53,7 @@ final class SyncEngine
     {
         $syncId = $ref->syncId()->toString();
 
-        // 1. Idempotency check — skip if already processed
+        // 1. Idempotency check — skip silently if already processed
         if ($this->idempotency->wasProcessed($syncId)) {
             Log::debug("[DualLayer] Skipped (idempotent): {$syncId}");
             return;
@@ -66,9 +67,10 @@ final class SyncEngine
         $this->repository->save($op);
 
         try {
-            $this->execute($ref, $op);
+            $this->execute($ref);
 
-            // 3. Mark processed in idempotency store first (prevents re-entry on crash)
+            // 3. Mark processed in idempotency store before marking completed
+            //    (prevents re-entry if a crash occurs between the two writes)
             $this->idempotency->markProcessed($syncId, config('dual-layer.idempotency.ttl', 86400));
 
             $op->markCompleted();
@@ -79,6 +81,11 @@ final class SyncEngine
             }
 
             Log::info("[DualLayer] Synced: {$ref->modelClass}#{$ref->modelId} op={$ref->operation}");
+
+        } catch (SyncSkippedException $e) {
+            $op->markSkipped();
+            $this->repository->save($op);
+            Log::debug("[DualLayer] {$e->getMessage()}");
 
         } catch (\Throwable $e) {
             $op->markFailed($e->getMessage());
@@ -96,7 +103,7 @@ final class SyncEngine
             ]);
 
             if ($op->canRetry()) {
-                $this->scheduleRetry($ref, $op->backoffSeconds());
+                $this->retryScheduler->schedule($ref, $op->backoffSeconds());
             } else {
                 Log::warning("[DualLayer] Dead letter: {$syncId} (exhausted {$op->attempts()} attempts)");
             }
@@ -105,7 +112,7 @@ final class SyncEngine
 
     // ── Internals ──────────────────────────────────────────────────────────
 
-    private function execute(ModelReference $ref, SyncOperation $op): void
+    private function execute(ModelReference $ref): void
     {
         $transformer = $this->resolveTransformer($ref->modelClass);
 
@@ -118,10 +125,10 @@ final class SyncEngine
             return;
         }
 
-        // Fetch fresh attributes from source (re-read to avoid stale observer data)
+        // Fetch fresh attributes from source (avoids stale observer snapshot)
         $attributes = $this->source->fetch($ref->modelClass, $ref->modelId);
 
-        // Deleted between observer fire and job execution — treat as delete
+        // Record was hard-deleted between observer fire and job execution
         if ($attributes === null) {
             $this->target->delete(
                 $transformer->collection(),
@@ -133,18 +140,19 @@ final class SyncEngine
 
         $document = $transformer->transform($attributes);
 
-        // Before-sync hook (can abort)
+        // Before-sync hook — returning false aborts via exception (sets SKIPPED)
         if (isset($this->hooks[$ref->modelClass])) {
             $proceed = $this->hooks[$ref->modelClass]->beforeSync($ref->operation, $document);
             if (! $proceed) {
-                Log::debug("[DualLayer] Aborted by hook: {$ref->modelClass}#{$ref->modelId}");
-                return;
+                throw new SyncSkippedException(
+                    "Aborted by hook: {$ref->modelClass}#{$ref->modelId}"
+                );
             }
         }
 
         $this->target->upsert(
             $transformer->collection(),
-            $attributes[$transformer->documentKey() === 'source_id' ? 'id' : $transformer->documentKey()],
+            $attributes[$transformer->sourceKey()],
             $transformer->documentKey(),
             $document,
         );
@@ -156,12 +164,5 @@ final class SyncEngine
     private function resolveTransformer(string $modelClass): TransformerInterface
     {
         return $this->transformers[$modelClass] ?? new DefaultTransformer($modelClass);
-    }
-
-    private function scheduleRetry(ModelReference $ref, int $backoffSeconds): void
-    {
-        ProcessSyncJob::dispatch($ref)
-            ->onQueue(config('dual-layer.queue.name', 'dual-layer-sync'))
-            ->delay(now()->addSeconds($backoffSeconds));
     }
 }

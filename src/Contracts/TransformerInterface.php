@@ -27,8 +27,15 @@ interface TransformerInterface
     public function transform(array $attributes): array;
 
     /**
-     * The field used as the MongoDB document _id.
-     * Defaults to 'source_id' for most cases.
+     * The field name in the MongoDB document used as the upsert key.
+     * Example: 'source_id'
      */
     public function documentKey(): string;
+
+    /**
+     * The attribute name in the MySQL model that maps to documentKey().
+     * Example: 'id' (when documentKey() = 'source_id')
+     * Defaults to 'id' for most cases.
+     */
+    public function sourceKey(): string;
 }

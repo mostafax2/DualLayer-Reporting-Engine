@@ -5,11 +5,13 @@ namespace Mostafax\DualLayer;
 use Illuminate\Support\ServiceProvider;
 use Mostafax\DualLayer\Application\SyncEngine;
 use Mostafax\DualLayer\Contracts\IdempotencyStoreInterface;
+use Mostafax\DualLayer\Contracts\RetrySchedulerInterface;
 use Mostafax\DualLayer\Contracts\SourceDriverInterface;
 use Mostafax\DualLayer\Contracts\TargetDriverInterface;
 use Mostafax\DualLayer\Domain\SyncOperation\Repositories\SyncOperationRepositoryInterface;
 use Mostafax\DualLayer\Infrastructure\Persistence\Cache\RedisIdempotencyStore;
 use Mostafax\DualLayer\Infrastructure\Persistence\Eloquent\Repositories\EloquentSyncOperationRepository;
+use Mostafax\DualLayer\Infrastructure\Scheduling\QueueRetryScheduler;
 use Mostafax\DualLayer\Infrastructure\Sources\EloquentSourceDriver;
 use Mostafax\DualLayer\Infrastructure\Targets\MongoDBTargetDriver;
 use Mostafax\DualLayer\Infrastructure\Targets\NullTargetDriver;
@@ -40,9 +42,11 @@ final class DualLayerServiceProvider extends ServiceProvider
                     config('dual-layer.target.connection', 'mongodb')
                 ),
                 'null'    => new NullTargetDriver(),
-                default   => $app->make($driver),   // custom class binding
+                default   => $app->make($driver),
             };
         });
+
+        $this->app->singleton(RetrySchedulerInterface::class, QueueRetryScheduler::class);
 
         $this->app->singleton(SyncEngine::class, function ($app) {
             return new SyncEngine(
@@ -50,6 +54,7 @@ final class DualLayerServiceProvider extends ServiceProvider
                 $app->make(TargetDriverInterface::class),
                 $app->make(IdempotencyStoreInterface::class),
                 $app->make(SyncOperationRepositoryInterface::class),
+                $app->make(RetrySchedulerInterface::class),
             );
         });
 
@@ -79,6 +84,7 @@ final class DualLayerServiceProvider extends ServiceProvider
                 Console\Commands\DualReportInstallCommand::class,
                 Console\Commands\DualReportStatusCommand::class,
                 Console\Commands\DualReportReprocessCommand::class,
+                Console\Commands\DualReportSyncCommand::class,
             ]);
         }
     }

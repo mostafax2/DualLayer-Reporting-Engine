@@ -59,32 +59,20 @@ final class EloquentSyncOperationRepository implements SyncOperationRepositoryIn
 
     private function hydrate(SyncOperationModel $row): SyncOperation
     {
-        $ref = new \ReflectionClass(SyncOperation::class);
-        $op  = $ref->newInstanceWithoutConstructor();
-
-        $set = function (string $prop, mixed $val) use ($op, $ref): void {
-            $p = $ref->getProperty($prop);
-            $p->setAccessible(true);
-            $p->setValue($op, $val);
-        };
-
-        $model = new ModelReference(
-            modelClass: $row->model_class,
-            modelId:    $row->model_id,
-            operation:  $row->operation,
-            updatedAt:  $row->model_updated_at?->toISOString() ?? now()->toISOString(),
-            tenantId:   $row->tenant_id,
+        return SyncOperation::reconstitute(
+            id:          SyncId::fromString($row->sync_id),
+            model:       new ModelReference(
+                modelClass: $row->model_class,
+                modelId:    $row->model_id,
+                operation:  $row->operation,
+                updatedAt:  $row->model_updated_at?->toISOString() ?? now()->toISOString(),
+                tenantId:   $row->tenant_id,
+            ),
+            status:      SyncStatus::from($row->status),
+            attempts:    $row->attempts,
+            maxAttempts: config('dual-layer.retry.max_attempts', 3),
+            lastError:   $row->last_error,
+            createdAt:   \DateTimeImmutable::createFromInterface($row->created_at),
         );
-
-        $set('id',          SyncId::fromString($row->sync_id));
-        $set('model',       $model);
-        $set('status',      SyncStatus::from($row->status));
-        $set('attempts',    $row->attempts);
-        $set('maxAttempts', config('dual-layer.retry.max_attempts', 3));
-        $set('lastError',   $row->last_error);
-        $set('createdAt',   \DateTimeImmutable::createFromInterface($row->created_at));
-        $set('domainEvents', []);
-
-        return $op;
     }
 }

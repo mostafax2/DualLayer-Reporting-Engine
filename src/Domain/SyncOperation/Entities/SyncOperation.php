@@ -4,8 +4,6 @@ namespace Mostafax\DualLayer\Domain\SyncOperation\Entities;
 
 use Mostafax\DualLayer\Domain\SyncOperation\Events\SyncCompleted;
 use Mostafax\DualLayer\Domain\SyncOperation\Events\SyncFailed;
-use Mostafax\DualLayer\Domain\SyncOperation\Events\SyncRetried;
-use Mostafax\DualLayer\Domain\SyncOperation\Exceptions\SyncException;
 use Mostafax\DualLayer\Domain\SyncOperation\ValueObjects\ModelReference;
 use Mostafax\DualLayer\Domain\SyncOperation\ValueObjects\SyncId;
 use Mostafax\DualLayer\Domain\SyncOperation\ValueObjects\SyncStatus;
@@ -34,6 +32,26 @@ final class SyncOperation
             maxAttempts: $maxAttempts,
             lastError:   null,
             createdAt:   new \DateTimeImmutable(),
+        );
+    }
+
+    public static function reconstitute(
+        SyncId             $id,
+        ModelReference     $model,
+        SyncStatus         $status,
+        int                $attempts,
+        int                $maxAttempts,
+        ?string            $lastError,
+        \DateTimeImmutable $createdAt,
+    ): self {
+        return new self(
+            id:          $id,
+            model:       $model,
+            status:      $status,
+            attempts:    $attempts,
+            maxAttempts: $maxAttempts,
+            lastError:   $lastError,
+            createdAt:   $createdAt,
         );
     }
 

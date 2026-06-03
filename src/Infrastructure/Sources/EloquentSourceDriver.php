@@ -9,8 +9,10 @@ final class EloquentSourceDriver implements SourceDriverInterface
     public function fetch(string $modelClass, int|string $modelId): ?array
     {
         /** @var \Illuminate\Database\Eloquent\Model $model */
-        $model = $modelClass::withTrashed()->find($modelId);
+        $query = method_exists($modelClass, 'withTrashed')
+            ? $modelClass::withTrashed()
+            : $modelClass::query();
 
-        return $model?->attributesToArray();
+        return $query->find($modelId)?->attributesToArray();
     }
 }

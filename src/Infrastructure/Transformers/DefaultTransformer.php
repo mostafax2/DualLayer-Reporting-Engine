@@ -40,4 +40,9 @@ final class DefaultTransformer implements TransformerInterface
     {
         return 'source_id';
     }
+
+    public function sourceKey(): string
+    {
+        return 'id';
+    }
 }
