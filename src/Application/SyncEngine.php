@@ -10,6 +10,7 @@ use Mostafax\DualLayer\Contracts\SyncHooksInterface;
 use Mostafax\DualLayer\Contracts\TargetDriverInterface;
 use Mostafax\DualLayer\Contracts\TransformerInterface;
 use Mostafax\DualLayer\Domain\SyncOperation\Entities\SyncOperation;
+use Mostafax\DualLayer\Domain\SyncOperation\Events\SyncRetried;
 use Mostafax\DualLayer\Domain\SyncOperation\Exceptions\SyncSkippedException;
 use Mostafax\DualLayer\Domain\SyncOperation\Repositories\SyncOperationRepositoryInterface;
 use Mostafax\DualLayer\Domain\SyncOperation\ValueObjects\ModelReference;
@@ -103,7 +104,9 @@ final class SyncEngine
             ]);
 
             if ($op->canRetry()) {
-                $this->retryScheduler->schedule($ref, $op->backoffSeconds());
+                $backoff = $op->backoffSeconds();
+                $this->retryScheduler->schedule($ref, $backoff);
+                event(new SyncRetried($syncId, $ref, $op->attempts(), $backoff));
             } else {
                 Log::warning("[DualLayer] Dead letter: {$syncId} (exhausted {$op->attempts()} attempts)");
             }
@@ -158,7 +161,7 @@ final class SyncEngine
         );
 
         // After-sync hook
-        $this->hooks[$ref->modelClass]?->afterSync($ref->operation, $document);
+        ($this->hooks[$ref->modelClass] ?? null)?->afterSync($ref->operation, $document);
     }
 
     private function resolveTransformer(string $modelClass): TransformerInterface

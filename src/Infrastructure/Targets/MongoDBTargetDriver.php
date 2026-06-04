@@ -56,7 +56,7 @@ final class MongoDBTargetDriver implements TargetDriverInterface
     {
         /** @var \MongoDB\Laravel\Connection $conn */
         $conn = \Illuminate\Support\Facades\DB::connection($this->connection);
-        return $conn->getMongoClient()
+        return $conn->getClient()
             ->selectDatabase($conn->getDatabaseName())
             ->selectCollection($collection);
     }

@@ -3,6 +3,7 @@
 namespace Mostafax\DualLayer\Domain\SyncOperation\Entities;
 
 use Mostafax\DualLayer\Domain\SyncOperation\Events\SyncCompleted;
+use Mostafax\DualLayer\Domain\SyncOperation\Events\SyncDead;
 use Mostafax\DualLayer\Domain\SyncOperation\Events\SyncFailed;
 use Mostafax\DualLayer\Domain\SyncOperation\ValueObjects\ModelReference;
 use Mostafax\DualLayer\Domain\SyncOperation\ValueObjects\SyncId;
@@ -74,6 +75,7 @@ final class SyncOperation
 
         if ($this->attempts >= $this->maxAttempts) {
             $this->status = SyncStatus::DEAD;
+            $this->raise(new SyncDead($this->id->toString(), $this->model, $error, $this->attempts));
         } else {
             $this->status = SyncStatus::FAILED;
             $this->raise(new SyncFailed($this->id->toString(), $this->model, $error, $this->attempts));

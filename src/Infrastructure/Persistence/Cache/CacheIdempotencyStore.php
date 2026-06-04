@@ -5,7 +5,7 @@ namespace Mostafax\DualLayer\Infrastructure\Persistence\Cache;
 use Illuminate\Contracts\Cache\Repository as Cache;
 use Mostafax\DualLayer\Contracts\IdempotencyStoreInterface;
 
-final class RedisIdempotencyStore implements IdempotencyStoreInterface
+final class CacheIdempotencyStore implements IdempotencyStoreInterface
 {
     private const PREFIX = 'dlr:idempotency:';
 

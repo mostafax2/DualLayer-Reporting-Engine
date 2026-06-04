@@ -9,7 +9,7 @@ use Mostafax\DualLayer\Contracts\RetrySchedulerInterface;
 use Mostafax\DualLayer\Contracts\SourceDriverInterface;
 use Mostafax\DualLayer\Contracts\TargetDriverInterface;
 use Mostafax\DualLayer\Domain\SyncOperation\Repositories\SyncOperationRepositoryInterface;
-use Mostafax\DualLayer\Infrastructure\Persistence\Cache\RedisIdempotencyStore;
+use Mostafax\DualLayer\Infrastructure\Persistence\Cache\CacheIdempotencyStore;
 use Mostafax\DualLayer\Infrastructure\Persistence\Eloquent\Repositories\EloquentSyncOperationRepository;
 use Mostafax\DualLayer\Infrastructure\Scheduling\QueueRetryScheduler;
 use Mostafax\DualLayer\Infrastructure\Sources\EloquentSourceDriver;
@@ -29,7 +29,7 @@ final class DualLayerServiceProvider extends ServiceProvider
             EloquentSourceDriver::class);
 
         $this->app->singleton(IdempotencyStoreInterface::class, function ($app) {
-            return new RedisIdempotencyStore(
+            return new CacheIdempotencyStore(
                 $app['cache']->store(config('dual-layer.idempotency.store', 'redis'))
             );
         });

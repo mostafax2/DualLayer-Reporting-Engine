@@ -100,9 +100,10 @@ use App\Models\Order;
 
 class OrderTransformer implements TransformerInterface
 {
-    public function handles(): string   { return Order::class; }
+    public function handles(): string    { return Order::class; }
     public function collection(): string { return 'orders'; }
-    public function documentKey(): string { return 'source_id'; }
+    public function documentKey(): string { return 'source_id'; }  // MongoDB field name
+    public function sourceKey(): string  { return 'id'; }          // MySQL attribute name
 
     public function transform(array $attr): array
     {
@@ -210,10 +211,44 @@ php artisan dual-report:install
 # Status dashboard
 php artisan dual-report:status
 
+# Initial / catch-up bulk sync for existing records
+php artisan dual-report:sync "App\Models\User"
+php artisan dual-report:sync "App\Models\Order" --chunk=1000
+
 # Requeue failed operations
 php artisan dual-report:reprocess --failed
 php artisan dual-report:reprocess --dead
 php artisan dual-report:reprocess --dead --limit=500
+```
+
+---
+
+## Domain Events
+
+Listen to any of these events in your `EventServiceProvider`:
+
+| Event | Fired when |
+|-------|-----------|
+| `SyncCompleted` | Document successfully written to MongoDB |
+| `SyncFailed` | Sync attempt failed — retry will be scheduled |
+| `SyncRetried` | Retry job dispatched (includes attempt # and backoff seconds) |
+| `SyncDead` | All retry attempts exhausted — operation moved to dead letter |
+
+```php
+use Mostafax\DualLayer\Domain\SyncOperation\Events\SyncDead;
+use Mostafax\DualLayer\Domain\SyncOperation\Events\SyncFailed;
+
+class EventServiceProvider extends ServiceProvider
+{
+    protected $listen = [
+        SyncDead::class => [
+            \App\Listeners\AlertOpsOnDeadSync::class,
+        ],
+        SyncFailed::class => [
+            \App\Listeners\LogSyncFailure::class,
+        ],
+    ];
+}
 ```
 
 ---
