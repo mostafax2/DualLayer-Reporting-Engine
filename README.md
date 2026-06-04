@@ -2,6 +2,8 @@
 
 > Enterprise-grade MySQL → MongoDB async sync engine for Laravel.
 
+[![Packagist](https://img.shields.io/packagist/v/mostafax/dual-layer-reporting-engine.svg)](https://packagist.org/packages/mostafax/dual-layer-reporting-engine)
+[![Downloads](https://img.shields.io/packagist/dt/mostafax/dual-layer-reporting-engine.svg)](https://packagist.org/packages/mostafax/dual-layer-reporting-engine)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![PHP](https://img.shields.io/badge/PHP-8.2%2B-blue.svg)](https://php.net)
 [![Laravel](https://img.shields.io/badge/Laravel-10%20|%2011%20|%2012%20|%2013-red.svg)](https://laravel.com)

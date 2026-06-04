@@ -4,6 +4,7 @@
     "type": "library",
     "license": "MIT",
     "keywords": ["laravel", "mongodb", "reporting", "sync", "analytics", "dual-layer"],
+    "homepage": "https://packagist.org/packages/mostafax/dual-layer-reporting-engine",
     "authors": [{"name": "Mostafa", "email": "mostafa.m.elbiar2@gmail.com"}],
     "require": {
         "php": "^8.2",
