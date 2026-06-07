@@ -54,4 +54,21 @@ return [
     */
     'auto_migrate' => (bool) env('DUAL_LAYER_AUTO_MIGRATE', false),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Registered Models (used by dual-report:sync --all)
+    |--------------------------------------------------------------------------
+    | List every Eloquent model class that should be synced to the target.
+    | These are processed in order when --all is passed. Models registered
+    | at runtime via DualReport::observe() are merged automatically.
+    |
+    | Example:
+    |   App\Models\User::class,
+    |   App\Models\Order::class,
+    */
+    'models' => [
+        // App\Models\User::class,
+        // App\Models\Order::class,
+    ],
+
 ];
